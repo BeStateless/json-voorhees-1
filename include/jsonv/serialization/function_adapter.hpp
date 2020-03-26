@@ -32,9 +32,18 @@ public:
     { }
 
 protected:
-    virtual T create(const extraction_context& context, const value& from) const override
+virtual result<T, void> create(extraction_context& context, reader& from) const override
     {
-        return create_impl(_extract, context, from);
+        using create_result_type = decltype(create_impl(_extract, context, from));
+
+        if constexpr (is_result_v<create_result_type>)
+        {
+            return create_impl(_extract, context, from);
+        }
+        else
+        {
+            return ok{ create_impl(_extract, context, from) };
+        }
     }
 
     virtual value to_json(const serialization_context& context, const T& from) const override
@@ -44,14 +53,14 @@ protected:
 
 private:
     template <typename FUExtract>
-    static auto create_impl(const FUExtract& func, const extraction_context& context, const value& from)
+    static auto create_impl(const FUExtract& func, extraction_context& context, reader& from)
             -> decltype(func(context, from))
     {
         return func(context, from);
     }
 
     template <typename FUExtract, typename = void>
-    static auto create_impl(const FUExtract& func, const extraction_context&, const value& from)
+    static auto create_impl(const FUExtract& func, extraction_context&, reader& from)
             -> decltype(func(from))
     {
         return func(from);
@@ -76,14 +85,15 @@ private:
     FToJson  _to_json;
 };
 
+// TODO(#150): These should be deduction guides _and_ have some checking for `result`
 template <typename FExtract, typename FToJson>
 auto make_adapter(FExtract extract, FToJson to_json_)
-    -> function_adapter<decltype(extract(std::declval<const extraction_context&>(), std::declval<const value&>())),
+    -> function_adapter<decltype(extract(std::declval<extraction_context&>(), std::declval<reader&>())),
                         FExtract,
                         FToJson
                        >
 {
-    return function_adapter<decltype(extract(std::declval<const extraction_context&>(), std::declval<const value&>())),
+    return function_adapter<decltype(extract(std::declval<extraction_context&>(), std::declval<reader&>())),
                             FExtract,
                             FToJson
                            >
@@ -92,12 +102,12 @@ auto make_adapter(FExtract extract, FToJson to_json_)
 
 template <typename FExtract, typename FToJson, typename = void>
 auto make_adapter(FExtract extract, FToJson to_json_)
-    -> function_adapter<decltype(extract(std::declval<const value&>())),
+    -> function_adapter<decltype(extract(std::declval<reader&>())),
                         FExtract,
                         FToJson
                        >
 {
-    return function_adapter<decltype(extract(std::declval<const value&>())),
+    return function_adapter<decltype(extract(std::declval<reader&>())),
                             FExtract,
                             FToJson
                            >

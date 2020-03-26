@@ -32,6 +32,21 @@ class ok;
 template <typename TError>
 class error;
 
+/// Checks whether \c T is a \c result type. Provides the member constant \c value as \c true if \c T is some form of
+/// \c result. Otherwise, \c value will be \c false.
+///
+/// \see is_result_v
+template <typename T>
+struct is_result : public std::false_type
+{ };
+
+template <typename TValue, typename TError>
+struct is_result<result<TValue, TError>> : public std::true_type
+{ };
+
+template <typename T>
+inline constexpr bool is_result_v = is_result<T>::value;
+
 }
 
 namespace jsonv::detail
@@ -1293,6 +1308,15 @@ public:
     constexpr explicit operator bool() const noexcept
     {
         return is_ok();
+    }
+
+    /// Check that this result not OK.
+    ///
+    /// \returns \c true if the \c state is \c result_state::error or \c result_state::empty; \c false if \c state is
+    ///          \c result_state::ok.
+    constexpr bool operator!() const noexcept
+    {
+        return !is_ok();
     }
 
     /// Check that this result has \c state of \c result_state::error.
